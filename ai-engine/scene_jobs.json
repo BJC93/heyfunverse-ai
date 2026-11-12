@@ -1,0 +1,102 @@
+[
+    {
+        "project_title": "చెప్పలేని ప్రేమ",
+        "scene_number": 1,
+        "start": 0,
+        "end": 5,
+        "duration": 5,
+        "style": "Telugu romantic cinema",
+        "character_prompt": "woman: Young Indian woman, long black hair, pastel blue saree\nman: Young Indian man, white shirt, dark trousers",
+        "characters": [
+            {
+                "id": "woman",
+                "description": "Young Indian woman, long black hair, pastel blue saree"
+            },
+            {
+                "id": "man",
+                "description": "Young Indian man, white shirt, dark trousers"
+            }
+        ],
+        "description": "Woman walks alone in the rain, man appears from behind a building.",
+        "image_prompt": "Woman in pastel blue saree walking in the rain, man in white shirt and dark trousers appears from behind a building.",
+        "motion_prompt": "Subtle movement of raindrops, man's silhouette emerging from behind the building.",
+        "camera": "Wide shot of the rain, then close-up of man's silhouette.",
+        "lighting": "Soft rain and street lighting.",
+        "status": "pending"
+    },
+    {
+        "project_title": "చెప్పలేని ప్రేమ",
+        "scene_number": 2,
+        "start": 5,
+        "end": 10,
+        "duration": 5,
+        "style": "Telugu romantic cinema",
+        "character_prompt": "woman: Young Indian woman, long black hair, pastel blue saree\nman: Young Indian man, white shirt, dark trousers",
+        "characters": [
+            {
+                "id": "woman",
+                "description": "Young Indian woman, long black hair, pastel blue saree"
+            },
+            {
+                "id": "man",
+                "description": "Young Indian man, white shirt, dark trousers"
+            }
+        ],
+        "description": "Man and woman exchange glances, man offers his umbrella.",
+        "image_prompt": "Woman with umbrella, man with open umbrella, both looking at each other.",
+        "motion_prompt": "Man gently offers his umbrella, woman accepts with a smile.",
+        "camera": "Medium shot of the couple, then close-up of their faces.",
+        "lighting": "Soft street lighting, man's shadow on woman's face.",
+        "status": "pending"
+    },
+    {
+        "project_title": "చెప్పలేని ప్రేమ",
+        "scene_number": 3,
+        "start": 10,
+        "end": 15,
+        "duration": 5,
+        "style": "Telugu romantic cinema",
+        "character_prompt": "woman: Young Indian woman, long black hair, pastel blue saree\nman: Young Indian man, white shirt, dark trousers",
+        "characters": [
+            {
+                "id": "woman",
+                "description": "Young Indian woman, long black hair, pastel blue saree"
+            },
+            {
+                "id": "man",
+                "description": "Young Indian man, white shirt, dark trousers"
+            }
+        ],
+        "description": "Man and woman walk together, man holds her hand.",
+        "image_prompt": "Man and woman walking together, man holding her hand, both smiling.",
+        "motion_prompt": "Man gently holds her hand, woman smiles back.",
+        "camera": "Wide shot of the couple walking, then close-up of their hands.",
+        "lighting": "Soft street lighting, man's shadow on woman's face.",
+        "status": "pending"
+    },
+    {
+        "project_title": "చెప్పలేని ప్రేమ",
+        "scene_number": 4,
+        "start": 15,
+        "end": 20,
+        "duration": 5,
+        "style": "Telugu romantic cinema",
+        "character_prompt": "woman: Young Indian woman, long black hair, pastel blue saree\nman: Young Indian man, white shirt, dark trousers",
+        "characters": [
+            {
+                "id": "woman",
+                "description": "Young Indian woman, long black hair, pastel blue saree"
+            },
+            {
+                "id": "man",
+                "description": "Young Indian man, white shirt, dark trousers"
+            }
+        ],
+        "description": "Woman leans into man, they share a kiss.",
+        "image_prompt": "Woman leans into man, both smiling, man's arm around her, they share a kiss.",
+        "motion_prompt": "Woman leans into man, they share a gentle kiss.",
+        "camera": "Close-up of their faces, then wide shot of the couple.",
+        "lighting": "Soft street lighting, man's shadow on woman's face.",
+        "status": "pending"
+    }
+]

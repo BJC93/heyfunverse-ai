@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.egg-info/
+
+# Virtual environments
+venv/
+video-env/
+.env/
+.venv/
+node_modules/
+
+# Environment variables
+.env
+.env.*
+
+# Model files
+*.onnx
+*.pt
+*.pth
+*.safetensors
+/storage/models/
+
+# Generated media
+/storage/characters/
+/storage/clips/
+/storage/final/
+/storage/images/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
