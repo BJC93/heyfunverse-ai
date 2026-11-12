@@ -1,7 +1,9 @@
-
 import argparse
 import json
+import os
 from pathlib import Path
+
+import numpy as np
 
 # ==========================================
 # PROJECT CONFIGURATION
@@ -12,27 +14,82 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 JOBS_FILE = PROJECT_ROOT / "ai-engine" / "scene_jobs.json"
 IMAGE_DIR = PROJECT_ROOT / "storage" / "images"
 
+# A photorealistic SD1.5 checkpoint gives far better faces/sarees than
+# the base SD1.5 model. Override with:  set IMAGE_MODEL_ID=<hf repo>
+MODEL_ID = os.environ.get(
+    "IMAGE_MODEL_ID",
+    "SG161222/Realistic_Vision_V5.1_noVAE"
+)
+
 MODEL_DIR = (
     PROJECT_ROOT
     / "storage"
     / "models"
-    / "openvino-sd15"
+    / ("openvino-" + MODEL_ID.split("/")[-1].lower())
 )
 
-MODEL_ID = "stable-diffusion-v1-5/stable-diffusion-v1-5"
+# SD1.5 is trained near 512px. 448x800 causes duplicated people and
+# bad faces. Generate 512x768, then center-crop to 9:16 (432x768).
+WIDTH = 512
+HEIGHT = 768
+CROP_SIZE = (432, 768)
 
-WIDTH = 448
-HEIGHT = 800
+INFERENCE_STEPS = 30
+GUIDANCE_SCALE = 7.0
+BASE_SEED = 1234  # same seed base keeps faces/lighting more consistent
 
-INFERENCE_STEPS = 25
-GUIDANCE_SCALE = 6.5
+# ==========================================
+# STYLE ANCHORS (matched to the reference photo)
+# ==========================================
+
+QUALITY = (
+    "RAW photo, photorealistic, 85mm lens, shallow depth of field, "
+    "soft natural light, detailed skin texture, sharp focus"
+)
+
+WOMAN = (
+    "beautiful young Indian woman, fair warm skin, long wavy black hair, "
+    "small black bindi, gentle smile, light pastel blue sheer chiffon saree "
+    "with delicate lace border, gold choker necklace"
+)
+
+MAN = (
+    "handsome young Indian man, short black hair, "
+    "white shirt, dark trousers"
+)
+
+# Per-scene composition. Subject text goes FIRST in the prompt because
+# CLIP only reads the first 77 tokens.
+SCENE_SUBJECTS = {
+    1: (
+        "portrait of {woman}, facing camera, looking at viewer, "
+        "walking on a wet evening street in light rain, "
+        "{man} blurred far in background, "
+        "three-quarter shot, wet road reflections"
+    ),
+    2: (
+        "{woman} and {man} standing close under one umbrella, "
+        "looking into each other's eyes, rainy evening, medium shot"
+    ),
+    3: (
+        "{man} holding {woman}'s hand, walking together in light rain, "
+        "both smiling, evening street lights, medium shot"
+    ),
+    4: (
+        "{woman} leaning toward {man}, his arm around her, "
+        "tender romantic moment, close-up, rainy evening bokeh lights"
+    ),
+}
 
 NEGATIVE_PROMPT = (
-    "cartoon, anime, illustration, painting, 3d render, "
-    "blurry, low resolution, pixelated, unrealistic face, "
+    "cartoon, anime, illustration, painting, 3d render, cgi, "
+    "blurry, low resolution, pixelated, plastic skin, "
     "deformed face, asymmetrical eyes, bad anatomy, "
     "extra fingers, missing fingers, extra limbs, "
-    "duplicate people, distorted hands, text, watermark, logo"
+    "duplicate people, distorted hands, text, watermark, logo, "
+    "western clothing, nudity, cleavage, "
+    "back view, from behind, facing away, rear view, "
+    "cropped head, no face, hair covering face"
 )
 
 
@@ -59,26 +116,22 @@ def load_scene_jobs():
 
 
 # ==========================================
-# CREATE IMAGE PROMPT
+# CREATE IMAGE PROMPT (now uses the job)
 # ==========================================
 
 def build_prompt(job):
-    prompt = (
-        "Photorealistic cinematic Indian romantic drama, "
-        "realistic human faces, natural skin texture, "
-        "professional movie cinematography. "
-        "A young Indian woman with long black hair, "
-        "wearing an elegant pastel blue saree, "
-        "walking alone on a rainy street at evening. "
-        "A young Indian man wearing a clean white shirt "
-        "and dark trousers is visible in the background, "
-        "emerging from behind a building. "
-        "Natural body proportions, realistic clothing, "
-        "beautiful rainy atmosphere, cinematic composition, "
-        "soft reflections on wet road, detailed background."
-    )
 
-    return prompt
+    scene_number = int(job["scene_number"])
+
+    template = SCENE_SUBJECTS.get(scene_number)
+
+    if template:
+        subject = template.format(woman=WOMAN, man=MAN)
+    else:
+        # Fallback for any custom scene: use the story's own prompt.
+        subject = job["image_prompt"]
+
+    return f"{subject}, {QUALITY}"
 
 
 # ==========================================
@@ -110,7 +163,7 @@ def load_image_pipeline(device):
 
     else:
 
-        print("First-time model download and conversion.")
+        print(f"First-time download/conversion of {MODEL_ID}.")
         print("This requires an internet connection and disk space.")
 
         pipeline = OVStableDiffusionPipeline.from_pretrained(
@@ -146,6 +199,17 @@ def load_image_pipeline(device):
 # GENERATE ONE IMAGE
 # ==========================================
 
+def center_crop(image, size):
+
+    target_w, target_h = size
+    w, h = image.size
+
+    left = (w - target_w) // 2
+    top = (h - target_h) // 2
+
+    return image.crop((left, top, left + target_w, top + target_h))
+
+
 def generate_scene_image(pipeline, job):
 
     scene_number = int(job["scene_number"])
@@ -153,7 +217,8 @@ def generate_scene_image(pipeline, job):
     output_file = IMAGE_DIR / f"scene_{scene_number:02d}.png"
 
     prompt = build_prompt(job)
-    
+
+    # CLIP limit is 77 tokens: truncate safely.
     tokens = pipeline.tokenizer(
         prompt,
         truncation=True,
@@ -166,12 +231,8 @@ def generate_scene_image(pipeline, job):
         skip_special_tokens=True
     )
 
-    print(
-        "Prompt tokens:",
-        len(tokens.input_ids[0])
-    )
-
     print(f"\nGenerating scene {scene_number}...")
+    print("Prompt:", prompt)
 
     result = pipeline(
         prompt=prompt,
@@ -180,10 +241,11 @@ def generate_scene_image(pipeline, job):
         height=HEIGHT,
         num_inference_steps=INFERENCE_STEPS,
         guidance_scale=GUIDANCE_SCALE,
-        num_images_per_prompt=1
+        num_images_per_prompt=1,
+        generator=np.random.RandomState(BASE_SEED + scene_number)
     )
 
-    image = result.images[0]
+    image = center_crop(result.images[0], CROP_SIZE)
 
     image.save(output_file)
 
@@ -224,32 +286,20 @@ def generate_images(device="CPU", force=False, scene_number=None):
 
     for job in jobs:
 
-        scene_number = int(job["scene_number"])
+        number = int(job["scene_number"])
 
-        output_file = IMAGE_DIR / f"scene_{scene_number:02d}.png"
+        output_file = IMAGE_DIR / f"scene_{number:02d}.png"
 
         if output_file.exists() and not force:
 
-            print(
-                f"\nScene {scene_number}: Image already exists. Skipping."
-            )
+            print(f"\nScene {number}: Image already exists. Skipping.")
 
             skipped += 1
             continue
 
-        try:
+        generate_scene_image(pipeline, job)
 
-            generate_scene_image(pipeline, job)
-
-            successful += 1
-
-        except Exception as error:
-
-            print(
-                f"\nScene {scene_number} failed: {error}"
-            )
-
-            raise
+        successful += 1
 
     print("\n====================================")
     print(" IMAGE GENERATION SUMMARY")
@@ -270,7 +320,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="HeyFunverse AI Image Generator"
     )
-    
+
     parser.add_argument(
         "--scene",
         type=int,
