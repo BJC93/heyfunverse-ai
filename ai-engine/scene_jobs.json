@@ -17,11 +17,11 @@
                 "description": "Young Indian man, white shirt, dark trousers"
             }
         ],
-        "description": "Woman walks alone in the rain, man appears from behind a building.",
-        "image_prompt": "Woman in pastel blue saree walking in the rain, man in white shirt and dark trousers appears from behind a building.",
-        "motion_prompt": "Subtle movement of raindrops, man's silhouette emerging from behind the building.",
-        "camera": "Wide shot of the rain, then close-up of man's silhouette.",
-        "lighting": "Soft rain and street lighting.",
+        "description": "Woman walks in the light rain on an evening street, man watches from behind her.",
+        "image_prompt": "Woman in pastel blue saree walking toward camera on a rainy evening street, soft smile, man in white shirt standing far behind her",
+        "motion_prompt": "Gentle rain falling, woman walks slowly toward camera, man steps out from the background.",
+        "camera": "Medium shot of the woman, then close-up of the man's silhouette.",
+        "lighting": "Soft street lights, wet road reflections.",
         "status": "pending"
     },
     {
@@ -42,11 +42,11 @@
                 "description": "Young Indian man, white shirt, dark trousers"
             }
         ],
-        "description": "Man and woman exchange glances, man offers his umbrella.",
-        "image_prompt": "Woman with umbrella, man with open umbrella, both looking at each other.",
-        "motion_prompt": "Man gently offers his umbrella, woman accepts with a smile.",
-        "camera": "Medium shot of the couple, then close-up of their faces.",
-        "lighting": "Soft street lighting, man's shadow on woman's face.",
+        "description": "Man holds his umbrella over the woman, they exchange glances.",
+        "image_prompt": "Man holding one umbrella over the woman, both close together looking at each other, soft smiles",
+        "motion_prompt": "Man raises the umbrella over her, woman looks up and smiles shyly.",
+        "camera": "Medium close-up of the couple.",
+        "lighting": "Soft street lights, warm glow on their faces.",
         "status": "pending"
     },
     {
@@ -67,11 +67,11 @@
                 "description": "Young Indian man, white shirt, dark trousers"
             }
         ],
-        "description": "Man and woman walk together, man holds her hand.",
-        "image_prompt": "Man and woman walking together, man holding her hand, both smiling.",
-        "motion_prompt": "Man gently holds her hand, woman smiles back.",
-        "camera": "Wide shot of the couple walking, then close-up of their hands.",
-        "lighting": "Soft street lighting, man's shadow on woman's face.",
+        "description": "Man and woman walk together in the rain, holding hands.",
+        "image_prompt": "Man and woman walking together holding hands, both smiling, wearing shoes",
+        "motion_prompt": "Couple walks slowly, his hand gently holding hers, rain falling around them.",
+        "camera": "Medium shot of the couple walking.",
+        "lighting": "Soft street lights, wet road reflections.",
         "status": "pending"
     },
     {
@@ -92,11 +92,11 @@
                 "description": "Young Indian man, white shirt, dark trousers"
             }
         ],
-        "description": "Woman leans into man, they share a kiss.",
-        "image_prompt": "Woman leans into man, both smiling, man's arm around her, they share a kiss.",
-        "motion_prompt": "Woman leans into man, they share a gentle kiss.",
-        "camera": "Close-up of their faces, then wide shot of the couple.",
-        "lighting": "Soft street lighting, man's shadow on woman's face.",
+        "description": "Woman and man share a quiet romantic moment, foreheads touching.",
+        "image_prompt": "Woman and man standing close, foreheads touching, eyes closed, gentle smiles, his hands on her shoulders",
+        "motion_prompt": "They lean together, foreheads touching, soft smiles as the rain slows.",
+        "camera": "Close-up of their faces.",
+        "lighting": "Warm street light bokeh, soft rain.",
         "status": "pending"
     }
 ]

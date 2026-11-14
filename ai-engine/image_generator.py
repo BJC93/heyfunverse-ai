@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 
 import numpy as np
@@ -34,7 +35,7 @@ WIDTH = 512
 HEIGHT = 768
 CROP_SIZE = (432, 768)
 
-INFERENCE_STEPS = 30
+INFERENCE_STEPS = 35
 GUIDANCE_SCALE = 7.0
 BASE_SEED = 1234  # same seed base keeps faces/lighting more consistent
 
@@ -43,42 +44,14 @@ BASE_SEED = 1234  # same seed base keeps faces/lighting more consistent
 # ==========================================
 
 QUALITY = (
-    "RAW photo, photorealistic, 85mm lens, shallow depth of field, "
-    "soft natural light, detailed skin texture, sharp focus"
+    "RAW photo, photorealistic, 85mm, detailed symmetrical face, sharp eyes"
 )
 
-WOMAN = (
-    "beautiful young Indian woman, fair warm skin, long wavy black hair, "
-    "small black bindi, gentle smile, light pastel blue sheer chiffon saree "
-    "with delicate lace border, gold choker necklace"
-)
-
-MAN = (
-    "handsome young Indian man, short black hair, "
-    "white shirt, dark trousers"
-)
-
-# Per-scene composition. Subject text goes FIRST in the prompt because
-# CLIP only reads the first 77 tokens.
-SCENE_SUBJECTS = {
-    1: (
-        "portrait of {woman}, facing camera, looking at viewer, "
-        "walking on a wet evening street in light rain, "
-        "{man} blurred far in background, "
-        "three-quarter shot, wet road reflections"
-    ),
-    2: (
-        "{woman} and {man} standing close under one umbrella, "
-        "looking into each other's eyes, rainy evening, medium shot"
-    ),
-    3: (
-        "{man} holding {woman}'s hand, walking together in light rain, "
-        "both smiling, evening street lights, medium shot"
-    ),
-    4: (
-        "{woman} leaning toward {man}, his arm around her, "
-        "tender romantic moment, close-up, rainy evening bokeh lights"
-    ),
+# Short visual anchors added on top of the descriptions in story.json.
+# Keys are the character "id" values from story.json.
+LOOK_ANCHORS = {
+    "woman": "Indian woman, long wavy black hair, bindi, gold necklace, pastel blue saree, full blouse",
+    "man": "Indian man, short black hair, white shirt",
 }
 
 NEGATIVE_PROMPT = (
@@ -89,7 +62,11 @@ NEGATIVE_PROMPT = (
     "duplicate people, distorted hands, text, watermark, logo, "
     "western clothing, nudity, cleavage, "
     "back view, from behind, facing away, rear view, "
-    "cropped head, no face, hair covering face"
+    "cropped head, no face, hair covering face, "
+    "barefoot, bare feet, no shoes, exposed midriff, bare stomach, "
+    "see-through, revealing clothes, "
+    "ugly, distorted eyes, crossed eyes, uneven eyes, bad teeth, "
+    "malformed mouth, mutated face, disfigured, double face"
 )
 
 
@@ -119,19 +96,42 @@ def load_scene_jobs():
 # CREATE IMAGE PROMPT (now uses the job)
 # ==========================================
 
+def first_clause(text):
+    """'Wide shot of rain, then close-up' -> 'Wide shot of rain'"""
+    return text.split(", then")[0].split(".")[0].strip()
+
+
 def build_prompt(job):
+    """Build the prompt from the scene fields that come from story.json.
 
-    scene_number = int(job["scene_number"])
+    CLIP reads only 77 tokens, so the order is by importance:
+    scene -> who is in it -> camera -> lighting -> quality.
+    """
 
-    template = SCENE_SUBJECTS.get(scene_number)
+    scene_text = job["image_prompt"].strip().rstrip(".")
 
-    if template:
-        subject = template.format(woman=WOMAN, man=MAN)
-    else:
-        # Fallback for any custom scene: use the story's own prompt.
-        subject = job["image_prompt"]
+    # Anchor only the characters that actually appear in this scene.
+    haystack = (job["image_prompt"] + " " + job["description"]).lower()
 
-    return f"{subject}, {QUALITY}"
+    anchors = []
+    for character in job.get("characters", []):
+        cid = character["id"]
+        if re.search(rf"\b{re.escape(cid.lower())}\b", haystack):
+            anchors.append(
+                LOOK_ANCHORS.get(cid, character["description"])
+            )
+
+    # Quality/face words come before camera+lighting so that, if the
+    # 77-token limit truncates anything, it is the least important part.
+    parts = [
+        scene_text,
+        "; ".join(anchors),
+        QUALITY,
+        first_clause(job["camera"]),
+        job["lighting"].rstrip("."),
+    ]
+
+    return ", ".join(p for p in parts if p)
 
 
 # ==========================================
@@ -199,6 +199,123 @@ def load_image_pipeline(device):
 # GENERATE ONE IMAGE
 # ==========================================
 
+# ==========================================
+# FACE REFINEMENT (second pass on each detected face)
+# ==========================================
+
+FACE_PROMPT = (
+    "detailed face of an Indian person, symmetrical eyes, natural skin, "
+    "sharp focus, soft smile, RAW photo"
+)
+FACE_NEGATIVE = (
+    "deformed face, distorted eyes, crossed eyes, uneven eyes, "
+    "bad teeth, malformed mouth, blurry, cartoon, plastic skin, "
+    "extra face, text, watermark"
+)
+FACE_STRENGTH = 0.35   # low = keep identity, only clean up details
+FACE_SIZE = 512
+
+
+def load_face_refiner(device):
+
+    try:
+        from optimum.intel import OVStableDiffusionImg2ImgPipeline
+        import cv2  # noqa: F401
+    except ImportError as error:
+        print(f"Face refinement disabled ({error}).")
+        return None
+
+    print("\nLoading face refiner (img2img)...")
+
+    refiner = OVStableDiffusionImg2ImgPipeline.from_pretrained(
+        str(MODEL_DIR),
+        device=device,
+        compile=False
+    )
+
+    refiner.reshape(
+        batch_size=1,
+        height=FACE_SIZE,
+        width=FACE_SIZE,
+        num_images_per_prompt=1
+    )
+
+    refiner.compile()
+
+    return refiner
+
+
+def detect_faces(image):
+
+    import cv2
+
+    gray = cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2GRAY)
+
+    cascade = cv2.CascadeClassifier(
+        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    )
+
+    boxes = cascade.detectMultiScale(
+        gray, scaleFactor=1.1, minNeighbors=4, minSize=(40, 40)
+    )
+
+    # biggest faces first, max 2 people
+    boxes = sorted(boxes, key=lambda b: b[2] * b[3], reverse=True)[:2]
+
+    return [tuple(int(v) for v in b) for b in boxes]
+
+
+def refine_faces(refiner, image, seed):
+
+    from PIL import Image, ImageDraw, ImageFilter
+
+    if refiner is None:
+        return image
+
+    faces = detect_faces(image)
+
+    print(f"Faces detected: {len(faces)}")
+
+    for index, (x, y, w, h) in enumerate(faces):
+
+        # square crop with generous padding (hair, jaw, forehead)
+        side = int(max(w, h) * 1.8)
+        cx, cy = x + w // 2, y + h // 2
+
+        left = max(0, min(image.width - side, cx - side // 2))
+        top = max(0, min(image.height - side, cy - side // 2))
+        side = min(side, image.width, image.height)
+
+        box = (left, top, left + side, top + side)
+
+        crop = image.crop(box).resize(
+            (FACE_SIZE, FACE_SIZE), Image.LANCZOS
+        )
+
+        fixed = refiner(
+            prompt=FACE_PROMPT,
+            negative_prompt=FACE_NEGATIVE,
+            image=crop,
+            strength=FACE_STRENGTH,
+            num_inference_steps=30,
+            guidance_scale=6.5,
+            generator=np.random.RandomState(seed + index)
+        ).images[0].resize((side, side), Image.LANCZOS)
+
+        # feathered oval mask so the patch blends in
+        mask = Image.new("L", (side, side), 0)
+        pad = int(side * 0.12)
+        ImageDraw.Draw(mask).ellipse(
+            (pad, pad, side - pad, side - pad), fill=255
+        )
+        mask = mask.filter(ImageFilter.GaussianBlur(side * 0.08))
+
+        image.paste(fixed, box[:2], mask)
+
+    return image
+
+
+
 def center_crop(image, size):
 
     target_w, target_h = size
@@ -210,7 +327,7 @@ def center_crop(image, size):
     return image.crop((left, top, left + target_w, top + target_h))
 
 
-def generate_scene_image(pipeline, job):
+def generate_scene_image(pipeline, job, refiner=None):
 
     scene_number = int(job["scene_number"])
 
@@ -245,7 +362,11 @@ def generate_scene_image(pipeline, job):
         generator=np.random.RandomState(BASE_SEED + scene_number)
     )
 
-    image = center_crop(result.images[0], CROP_SIZE)
+    image = refine_faces(
+        refiner, result.images[0], BASE_SEED + scene_number
+    )
+
+    image = center_crop(image, CROP_SIZE)
 
     image.save(output_file)
 
@@ -258,7 +379,7 @@ def generate_scene_image(pipeline, job):
 # MAIN IMAGE GENERATION PIPELINE
 # ==========================================
 
-def generate_images(device="CPU", force=False, scene_number=None):
+def generate_images(device="CPU", force=False, scene_number=None, refine=True):
 
     print("\n====================================")
     print(" HEYFUNVERSE AI IMAGE GENERATOR")
@@ -281,6 +402,8 @@ def generate_images(device="CPU", force=False, scene_number=None):
 
     pipeline = load_image_pipeline(device)
 
+    refiner = load_face_refiner(device) if refine else None
+
     successful = 0
     skipped = 0
 
@@ -297,7 +420,7 @@ def generate_images(device="CPU", force=False, scene_number=None):
             skipped += 1
             continue
 
-        generate_scene_image(pipeline, job)
+        generate_scene_image(pipeline, job, refiner)
 
         successful += 1
 
@@ -340,10 +463,17 @@ if __name__ == "__main__":
         help="Regenerate existing scene images"
     )
 
+    parser.add_argument(
+        "--no-refine",
+        action="store_true",
+        help="Skip the face refinement pass (faster)"
+    )
+
     args = parser.parse_args()
 
     generate_images(
         device=args.device,
         force=args.force,
-        scene_number=args.scene
+        scene_number=args.scene,
+        refine=not args.no_refine
     )
