@@ -47,26 +47,26 @@ if __name__ == "__main__":
         help="Generate a new story using Ollama"
     )
 
+    parser.add_argument(
+        "--theme",
+        default="A shy couple meets during a rainy evening in Hyderabad.",
+        help="Story theme used with --generate"
+    )
+
     args = parser.parse_args()
 
     if args.generate:
 
+        import config
+        import safe_io
         from story_planner import generate_story
-        import json
-        from pathlib import Path
 
-        root = Path(__file__).resolve().parents[1]
-        output = root / "storage" / "story.json"
+        story = generate_story(theme=args.theme)
 
-        story = generate_story(
-            theme="A shy couple meets during a rainy evening in Hyderabad."
-        )
+        # An existing story is backed up to storage/backups/ before replacement.
+        saved = safe_io.write_json_safely(config.STORY_FILE, story)
 
-        output.parent.mkdir(parents=True, exist_ok=True)
-
-        output.write_text(
-            json.dumps(story, indent=2, ensure_ascii=False),
-            encoding="utf-8"
-        )
+        if saved["backup"]:
+            print(f"Previous story backed up: {saved['backup']}")
 
     run_pipeline()

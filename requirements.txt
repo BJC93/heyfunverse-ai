@@ -1,0 +1,24 @@
+# HeyFunverse AI runtime dependencies (Windows, Python 3.13).
+#
+# Versions are deliberately not pinned here: they are unverified by the
+# author on your machine. After a working install, run
+#     scripts\freeze_env.ps1
+# to record the exact versions that work in requirements.lock.txt, and use
+#     pip install -r requirements.lock.txt
+# to reproduce that environment later.
+
+numpy
+Pillow
+psutil
+
+# OpenVINO + Stable Diffusion
+openvino
+optimum-intel[openvino]
+diffusers
+transformers
+torch
+
+# Optional: face detection/recognition tools (Phase 2). Needs the small
+# models described in docs/FACE_MODELS.md for YuNet/SFace; the Haar fallback
+# works without any download.
+opencv-python

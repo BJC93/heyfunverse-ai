@@ -3,8 +3,13 @@ import json
 import urllib.request
 import urllib.error
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "qwen2.5:3b"
+import config
+import safe_io
+
+# Values now come from config.py (override with HEYFUN_OLLAMA_URL / HEYFUN_OLLAMA_MODEL).
+OLLAMA_URL = config.OLLAMA_GENERATE_URL
+MODEL = config.OLLAMA_MODEL
+STORY_OUTPUT = config.STORY_FILE
 
 
 def validate_story(story):
@@ -186,22 +191,11 @@ if __name__ == "__main__":
             duration=20
         )
 
-        STORY_OUTPUT.parent.mkdir(
-            parents=True,
-            exist_ok=True
-        )
+        # An existing story is backed up to storage/backups/ before replacement.
+        saved = safe_io.write_json_safely(STORY_OUTPUT, story)
 
-        with open(
-            STORY_OUTPUT,
-            "w",
-            encoding="utf-8"
-        ) as file:
-            json.dump(
-                story,
-                file,
-                indent=2,
-                ensure_ascii=False
-            )
+        if saved["backup"]:
+            print(f"Previous story backed up: {saved['backup']}")
 
         print(f"\nStory saved successfully: {STORY_OUTPUT}")
 
